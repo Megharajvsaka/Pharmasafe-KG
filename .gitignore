@@ -1,0 +1,66 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# PharmaSafe-KG .gitignore
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Python bytecode & caches ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ── Virtual environments ─────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Environment & secrets (NEVER commit credentials) ─────────────────────────
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# ── Data files (too large for Git, downloaded separately) ─────────────────────
+phase1/data/
+phase1/outputs/
+phase1/logs/
+phase2/outputs/
+phase2/logs/
+phase4/colab_data/
+
+# ── GNN model weights & embeddings (large binary files) ──────────────────────
+*.pt
+*.pth
+*.onnx
+*.h5
+
+# ── Generated images from training ───────────────────────────────────────────
+phase4/training_curves.png
+
+# ── IDE & editor settings ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Distribution & packaging ────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+
+# ── Testing & coverage ──────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Jupyter notebooks checkpoints ───────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── OS-generated files ──────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
