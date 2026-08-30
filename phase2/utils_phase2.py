@@ -31,7 +31,8 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def print_section(title: str):
-    print(f"\n{'─'*60}\n  {title}\n{'─'*60}")
+    print(f"\n{'-'*60}\n  {title}\n{'-'*60}")
+
 
 
 def batch(lst: list, size: int):

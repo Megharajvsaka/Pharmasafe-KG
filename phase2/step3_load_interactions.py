@@ -153,10 +153,23 @@ def main():
     driver = get_driver()
     log.info("  Connected to Neo4j AuraDB")
 
+    # Clear previous INTERACTS_WITH edges to ensure clean replacement
+    print_section("Clearing old INTERACTS_WITH edges")
+    with driver.session() as session:
+        session.run("""
+            MATCH ()-[r:INTERACTS_WITH]->()
+            CALL {
+                WITH r
+                DELETE r
+            } IN TRANSACTIONS OF 10000 ROWS
+        """)
+    log.info("  Cleared previous INTERACTS_WITH edges.")
+
     # Load
-    print_section("Loading INTERACTS_WITH edges (this takes 2–5 minutes)")
+    print_section("Loading INTERACTS_WITH edges (this takes 2-5 minutes)")
     log.info(f"  Batch size: {BATCH_SIZE} | Total batches: {len(records)//BATCH_SIZE + 1}")
     stats = load_interactions(driver, records)
+
 
     # Verify
     print_section("Verifying edge counts in Neo4j")
@@ -185,7 +198,8 @@ def main():
         """))
         log.info(f"  Warfarin interactions (top 5):")
         for r in warfarin:
-            log.info(f"    warfarin ↔ {r['drug']:30s} [{r['sev']}]")
+            log.info(f"    warfarin <-> {r['drug']:30s} [{r['sev']}]")
+
 
     driver.close()
     log.info("\n  Step 3 COMPLETE. Proceed to step4_load_drugs.py")
