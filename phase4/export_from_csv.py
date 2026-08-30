@@ -66,39 +66,53 @@ def export_all():
                 "label": 1,
             })
 
-    # Limit to top 100k positive edges for balanced memory footprint if larger
-    df_pos = pd.DataFrame(pos_records).drop_duplicates(subset=["node1", "node2"])
+    # Canonicalize pairs (node1 < node2) for undirected graph representation
+    pos_records_canonical = []
+    for r in pos_records:
+        u, v = sorted([r["node1"], r["node2"]])
+        pos_records_canonical.append({
+            "node1": u,
+            "node2": v,
+            "severity": r["severity"],
+            "severity_label": r["severity_label"],
+            "label": 1,
+        })
+
+    df_pos = pd.DataFrame(pos_records_canonical).drop_duplicates(subset=["node1", "node2"]).reset_index(drop=True)
     if len(df_pos) > 100000:
         df_pos = df_pos.sample(n=100000, random_state=42).reset_index(drop=True)
 
-    # Generate negative pairs
+    # Generate negative pairs (strictly non-interacting, zero overlap with pos_edges)
     random.seed(42)
     num_nodes = len(all_drugs)
     edge_set = set(zip(df_pos["node1"], df_pos["node2"])) | set(zip(df_pos["node2"], df_pos["node1"]))
     negatives = []
     target_neg = min(len(df_pos), 50000)
     attempts = 0
-    max_attempts = target_neg * 10
+    max_attempts = target_neg * 20
 
     while len(negatives) < target_neg and attempts < max_attempts:
         a = random.randint(0, num_nodes - 1)
         b = random.randint(0, num_nodes - 1)
-        if a != b and (a, b) not in edge_set:
-            negatives.append({
-                "node1": a,
-                "node2": b,
-                "severity": "NONE",
-                "severity_label": -1,
-                "label": 0,
-            })
-            edge_set.add((a, b))
-            edge_set.add((b, a))
+        if a != b:
+            u, v = sorted([a, b])
+            if (u, v) not in edge_set:
+                negatives.append({
+                    "node1": u,
+                    "node2": v,
+                    "severity": "NONE",
+                    "severity_label": -1,
+                    "label": 0,
+                })
+                edge_set.add((u, v))
+                edge_set.add((v, u))
         attempts += 1
 
     df_neg = pd.DataFrame(negatives)
     df_edges = pd.concat([df_pos, df_neg], ignore_index=True).sample(frac=1, random_state=42).reset_index(drop=True)
     df_edges.to_csv(COLAB_DIR / "edges.csv", index=False)
     print(f"   Exported {len(df_pos):,} positive + {len(df_neg):,} negative edges -> colab_data/edges.csv")
+
 
     # 3. Build deterministic SHA-256 node features
     print("4. Computing deterministic SHA-256 node features...")

@@ -97,54 +97,85 @@ print(f"\nSeverity distribution:\n{sev_counts.to_string()}")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# CELL 5 — Build PyTorch Geometric Data object
+# CELL 5 — Deterministic Seed & Leakage-Free Train/Val/Test Split
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Node feature matrix
-feat_cols  = [c for c in features_df.columns if c not in ["node_id", "name"]]
-x          = torch.tensor(features_df[feat_cols].values, dtype=torch.float)
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
+    torch.backends.cudnn.deterministic = True
 
-# Add degree as a feature (computed from edge list)
-degree = torch.zeros(num_nodes)
-for _, row in pos_edges.iterrows():
-    degree[int(row["node1"])] += 1
-    degree[int(row["node2"])] += 1
-degree = (degree / degree.max()).unsqueeze(1)  # normalise
-x = torch.cat([x, degree], dim=1)
+# 1. Split positive edges (70% train, 15% val, 15% test)
+pos_edges_shuffled = pos_edges.sample(frac=1, random_state=SEED).reset_index(drop=True)
+n_pos = len(pos_edges_shuffled)
+n_pos_train = int(0.70 * n_pos)
+n_pos_val   = int(0.15 * n_pos)
 
-print(f"Node feature matrix shape: {x.shape}")  # [num_nodes, num_features]
+pos_train = pos_edges_shuffled.iloc[:n_pos_train].reset_index(drop=True)
+pos_val   = pos_edges_shuffled.iloc[n_pos_train:n_pos_train + n_pos_val].reset_index(drop=True)
+pos_test  = pos_edges_shuffled.iloc[n_pos_train + n_pos_val:].reset_index(drop=True)
 
-# Edge index for positive edges (both directions — undirected graph)
-edge_index = torch.tensor(
-    [pos_edges["node1"].tolist() + pos_edges["node2"].tolist(),
-     pos_edges["node2"].tolist() + pos_edges["node1"].tolist()],
+# 2. Split negative edges (70% train, 15% val, 15% test)
+neg_edges_shuffled = neg_edges.sample(frac=1, random_state=SEED).reset_index(drop=True)
+n_neg = len(neg_edges_shuffled)
+n_neg_train = int(0.70 * n_neg)
+n_neg_val   = int(0.15 * n_neg)
+
+neg_train = neg_edges_shuffled.iloc[:n_neg_train].reset_index(drop=True)
+neg_val   = neg_edges_shuffled.iloc[n_neg_train:n_neg_train + n_neg_val].reset_index(drop=True)
+neg_test  = neg_edges_shuffled.iloc[n_neg_train + n_neg_val:].reset_index(drop=True)
+
+# 3. Build evaluation candidate pairs for each split
+train_df = pd.concat([pos_train, neg_train], ignore_index=True).sample(frac=1, random_state=SEED).reset_index(drop=True)
+val_df   = pd.concat([pos_val, neg_val], ignore_index=True).sample(frac=1, random_state=SEED).reset_index(drop=True)
+test_df  = pd.concat([pos_test, neg_test], ignore_index=True).sample(frac=1, random_state=SEED).reset_index(drop=True)
+
+X_train = train_df[["node1", "node2"]].values
+y_train = train_df["label"].values
+
+X_val   = val_df[["node1", "node2"]].values
+y_val   = val_df["label"].values
+
+X_test  = test_df[["node1", "node2"]].values
+y_test  = test_df["label"].values
+
+print(f"Train candidate pairs : {len(X_train):,} (pos: {len(pos_train):,}, neg: {len(neg_train):,})")
+print(f"Val candidate pairs   : {len(X_val):,} (pos: {len(pos_val):,}, neg: {len(neg_val):,})")
+print(f"Test candidate pairs  : {len(X_test):,} (pos: {len(pos_test):,}, neg: {len(neg_test):,})")
+print(f"Positive rates -> Train: {y_train.mean():.2%}, Val: {y_val.mean():.2%}, Test: {y_test.mean():.2%}")
+
+# 4. Construct LEAKAGE-FREE message-passing edge index from pos_train ONLY
+# Validation and test positive edges are strictly excluded from message passing.
+train_edge_index = torch.tensor(
+    [pos_train["node1"].tolist() + pos_train["node2"].tolist(),
+     pos_train["node2"].tolist() + pos_train["node1"].tolist()],
     dtype=torch.long
-)
+).to(device)
 
-# Severity labels for edges (for multi-class prediction)
-sev_labels = torch.tensor(pos_edges["severity_label"].tolist(), dtype=torch.long)
+# Compute degree feature strictly from positive training edges
+train_degree = torch.zeros(num_nodes)
+for _, row in pos_train.iterrows():
+    train_degree[int(row["node1"])] += 1
+    train_degree[int(row["node2"])] += 1
+if train_degree.max() > 0:
+    train_degree = (train_degree / train_degree.max()).unsqueeze(1)
+else:
+    train_degree = train_degree.unsqueeze(1)
 
-graph_data = Data(x=x, edge_index=edge_index)
-graph_data = graph_data.to(device)
+# Node feature matrix: SHA-256 features + train degree
+feat_cols = [c for c in features_df.columns if c not in ["node_id", "name"]]
+x_base = torch.tensor(features_df[feat_cols].values, dtype=torch.float)
+x = torch.cat([x_base, train_degree], dim=1).to(device)
 
-print(f"Graph: {graph_data}")
+graph_data = Data(x=x, edge_index=train_edge_index).to(device)
 
+print(f"Node feature matrix shape: {graph_data.x.shape}")
+print(f"Leakage-Free Training Graph: {graph_data}")
+print(f"Message-passing directed edges: {graph_data.edge_index.shape[1]:,} (derived strictly from {len(pos_train):,} pos_train edges)")
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# CELL 6 — Train/Val/Test split
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-all_pairs  = pd.concat([pos_edges, neg_edges], ignore_index=True)
-all_pairs  = all_pairs.sample(frac=1, random_state=42).reset_index(drop=True)
-
-X = all_pairs[["node1", "node2"]].values
-y = all_pairs["label"].values
-
-X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
-X_val,   X_test, y_val,   y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42, stratify=y_temp)
-
-print(f"Train: {len(X_train):,}  Val: {len(X_val):,}  Test: {len(X_test):,}")
-print(f"Positive rate — Train: {y_train.mean():.2%}  Val: {y_val.mean():.2%}  Test: {y_test.mean():.2%}")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

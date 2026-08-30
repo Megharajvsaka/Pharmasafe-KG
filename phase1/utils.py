@@ -161,14 +161,15 @@ def write_report(lines: list[str], path: Path) -> None:
         f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write("=" * 60 + "\n\n")
         f.write("\n".join(lines))
-    print(f"\n  Report saved → {path}")
+    print(f"\n  Report saved -> {path}")
 
 
 def print_section(title: str) -> None:
     """Prints a visible section header to the terminal."""
-    print(f"\n{'─' * 60}")
+    print(f"\n{'-' * 60}")
     print(f"  {title}")
-    print(f"{'─' * 60}")
+    print(f"{'-' * 60}")
+
 
 
 def count_chars(text: str) -> int:

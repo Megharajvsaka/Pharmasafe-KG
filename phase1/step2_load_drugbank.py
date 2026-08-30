@@ -97,9 +97,10 @@ def check_files():
     """
     missing = []
     if not DDI_FILE.exists():
-        missing.append(f"  MISSING: {DDI_FILE}\n  → Rename 'DDI_data.csv' to 'drug_interactions.csv' and place it in phase1/data/")
+        missing.append(f"  MISSING: {DDI_FILE}\n  -> Rename 'DDI_data.csv' to 'drug_interactions.csv' and place it in phase1/data/")
     if not DESC_FILE.exists():
-        missing.append(f"  MISSING: {DESC_FILE}\n  → Rename 'db_drug_interactions.csv' to 'drug_descriptions.csv' and place it in phase1/data/")
+        missing.append(f"  MISSING: {DESC_FILE}\n  -> Rename 'db_drug_interactions.csv' to 'drug_descriptions.csv' and place it in phase1/data/")
+
     if missing:
         log.error("Required files not found:")
         for m in missing:
@@ -173,7 +174,8 @@ def build_merged_dataframe(df_ddi: pd.DataFrame, desc_map: dict) -> pd.DataFrame
     Infers severity from interaction_type.
     Adds alias rows for paracetamol/aspirin so fuzzy matching works correctly.
     """
-    print_section("STEP 2 — Merging DDI data with descriptions")
+    print_section("STEP 2 - Merging DDI data with descriptions")
+
 
     rows = []
     no_desc = 0
@@ -225,7 +227,7 @@ def add_alias_rows(df: pd.DataFrame) -> pd.DataFrame:
         → add alias row with name "Paracetamol" pointing to same interactions
         → fuzzy match score for "paracetamol" → "paracetamol" = 100 (perfect)
     """
-    print_section("STEP 2 — Adding Indian name alias rows")
+    print_section("STEP 2 - Adding Indian name alias rows")
     alias_rows = []
 
     for _, row in df.iterrows():
@@ -255,14 +257,14 @@ def add_alias_rows(df: pd.DataFrame) -> pd.DataFrame:
         df_aliases = pd.DataFrame(alias_rows)
         df = pd.concat([df, df_aliases], ignore_index=True)
         log.info(f"  Added {len(alias_rows):,} alias rows for Indian name variants")
-        log.info(f"  Key aliases resolved: acetaminophen↔paracetamol, acetylsalicylic acid↔aspirin")
+        log.info(f"  Key aliases resolved: acetaminophen <-> paracetamol, acetylsalicylic acid <-> aspirin")
     else:
         log.info("  No alias rows needed.")
 
     return df
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 def clean_final(df: pd.DataFrame) -> pd.DataFrame:
     """
     Final cleaning:
@@ -270,7 +272,8 @@ def clean_final(df: pd.DataFrame) -> pd.DataFrame:
     2. Direction-agnostic deduplication (keep highest severity)
     3. Trim to AuraDB free-tier DDI budget (100K relationships)
     """
-    print_section("STEP 2 — Final cleaning and deduplication")
+    print_section("STEP 2 - Final cleaning and deduplication")
+
     log.info(f"  Starting rows: {len(df):,}")
 
     # Remove self-interactions
@@ -317,7 +320,7 @@ def validate_key_interactions(df: pd.DataFrame):
     Spot-checks that the most important clinical DDI pairs are present.
     These are interactions every clinical DDI system must catch.
     """
-    print_section("STEP 2 — Validating key clinical interactions")
+    print_section("STEP 2 - Validating key clinical interactions")
 
     checks = [
         ("warfarin",     "ibuprofen",         "MAJOR"),
@@ -343,15 +346,15 @@ def validate_key_interactions(df: pd.DataFrame):
             actual_sev = row["severity"]
             ok = (expected_sev is None) or (actual_sev == expected_sev)
             status = "PASS" if ok else "WARN"
-            log.info(f"  {status}  {d1} + {d2} → {actual_sev}")
+            log.info(f"  {status}  {d1} + {d2} -> {actual_sev}")
         elif drug1_exists and drug2_exists:
-            log.info(f"  INFO  {d1} + {d2} — both drugs present but no direct interaction pair")
+            log.info(f"  INFO  {d1} + {d2} - both drugs present but no direct interaction pair")
         else:
             missing = [d for d in [d1, d2] if d not in drugs]
-            log.warning(f"  WARN  {d1} + {d2} — missing from drug vocab: {missing}")
+            log.warning(f"  WARN  {d1} + {d2} - missing from drug vocab: {missing}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 def main():
     log.info("=" * 60)
     log.info("PharmaSafe-KG  |  Phase 1  |  Step 2: DrugBank (Updated)")
@@ -382,10 +385,11 @@ def main():
                    "interaction_type", "pair_key"]
     df_clean[output_cols].to_csv(CLEANED_DRUGBANK_CSV, index=False, encoding="utf-8")
 
-    log.info(f"\n  Saved → {CLEANED_DRUGBANK_CSV}")
+    log.info(f"\n  Saved -> {CLEANED_DRUGBANK_CSV}")
     log.info(f"  Total DDI pairs ready for Neo4j: {len(df_clean):,}")
     log.info("\n  Step 2 COMPLETE. Proceed to step3_fuzzy_match.py")
     return df_clean
+
 
 
 if __name__ == "__main__":
