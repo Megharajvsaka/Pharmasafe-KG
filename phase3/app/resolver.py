@@ -80,6 +80,16 @@ ALIASES: dict[str, str] = {
     "albuterol":            "salbutamol",
     "frusemide":            "furosemide",
     "furosemide":           "frusemide",
+    "glibenclamide":        "glyburide",
+    "glyburide":            "glibenclamide",
+    "ciclosporin":          "cyclosporine",
+    "cyclosporine":         "ciclosporin",
+    "rifampicin":           "rifampin",
+    "rifampin":             "rifampicin",
+    "amoxycillin":          "amoxicillin",
+    "amoxicillin":          "amoxycillin",
+    "dothiepin":            "dosulepin",
+    "dosulepin":            "dothiepin",
 }
 
 

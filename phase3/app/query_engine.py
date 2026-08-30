@@ -108,12 +108,12 @@ def check_interactions(generics_map: dict[str, list[str]]) -> dict:
                         "brand_b":      brand_b,
                         "ingredient_a": g_a,
                         "ingredient_b": g_b,
-                        "severity":     "MODERATE",
-                        "mechanism":    f"Predicted potential interaction via GraphSAGE link prediction (confidence: {prob*100:.1f}%).",
+                        "severity":     "UNKNOWN",
+                        "mechanism":    f"Predicted potential interaction via GraphSAGE link prediction (confidence: {prob*100:.1f}%). Clinical severity unassessed.",
                         "status":       "predicted",
                         "source":       "gnn_predicted",
                         "confidence":   prob,
-                        "evidence":     [{"model": "GraphSAGE", "probability": prob, "threshold": 0.70}],
+                        "evidence":     [{"model": "GraphSAGE", "probability": prob, "threshold": 0.70, "evidence_type": "inductive_link_prediction"}],
                         "explanation":  _build_predicted_explanation(brand_a, g_a, brand_b, g_b, prob),
                     })
 
@@ -131,7 +131,7 @@ def check_interactions(generics_map: dict[str, list[str]]) -> dict:
             safe_pairs.append({
                 "brand_a": brand_a,
                 "brand_b": brand_b,
-                "note":    "No documented interaction in current knowledge base",
+                "note":    "No documented interaction in current knowledge base. (Note: Lack of documented evidence does not guarantee clinical safety.)",
                 "status":  "not_documented",
             })
 
@@ -187,9 +187,11 @@ def _build_explanation(brand_a, ing_a, brand_b, ing_b, severity, mechanism) -> s
     Builds the XAI explanation sentence for documented KG interactions.
     """
     sev_text = {
-        "MAJOR":    "⚠️ MAJOR RISK",
-        "MODERATE": "⚠️ MODERATE RISK",
-        "MINOR":    "ℹ️ MINOR INTERACTION",
+        "MAJOR":      "⚠️ MAJOR RISK",
+        "MODERATE":   "⚠️ MODERATE RISK",
+        "MINOR":      "ℹ️ MINOR INTERACTION",
+        "UNKNOWN":    "ℹ️ AI PREDICTED (SEVERITY UNKNOWN)",
+        "UNASSESSED": "ℹ️ AI PREDICTED (SEVERITY UNASSESSED)",
     }.get(severity, "INTERACTION DETECTED")
 
     mech = mechanism.strip()
@@ -214,12 +216,13 @@ def _build_predicted_explanation(brand_a, ing_a, brand_b, ing_b, probability) ->
         f"{brand_a} contains {ing_a.title()}. "
         f"{brand_b} contains {ing_b.title()}.\n\n"
         f"Note: This interaction is not yet indexed in the primary Knowledge Graph, "
-        f"but was inferred by the Graph Neural Network (GraphSAGE link prediction)."
+        f"but was inferred by the Graph Neural Network (GraphSAGE link prediction). "
+        f"Clinical severity is unassessed."
     )
 
 
 def _severity_rank(sev: str) -> int:
-    return {"MAJOR": 0, "MODERATE": 1, "MINOR": 2}.get(sev, 3)
+    return {"MAJOR": 0, "MODERATE": 1, "MINOR": 2, "UNKNOWN": 3, "UNASSESSED": 3}.get(sev, 4)
 
 
 def _status_rank(status: str | None) -> int:

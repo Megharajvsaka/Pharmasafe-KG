@@ -79,20 +79,27 @@ st.markdown("""
     border: 1px solid #38a169; border-left: 4px solid #38a169;
     border-radius: 10px; padding: 1.1rem 1.3rem; margin: 0.6rem 0;
 }
+.card-predicted {
+    background: linear-gradient(135deg, #1f1435 0%, #120c22 100%);
+    border: 1px solid #7e22ce; border-left: 4px solid #a855f7;
+    border-radius: 10px; padding: 1.1rem 1.3rem; margin: 0.6rem 0;
+}
 .card-safe {
     background: #13161f; border: 1px solid #2d3748;
     border-radius: 10px; padding: 0.8rem 1.1rem; margin: 0.4rem 0;
 }
 
 /* ── Badges ─────────────────────────── */
-.badge-major    { background:#e53e3e; color:#fff; padding:3px 10px;
-                  border-radius:20px; font-size:0.75rem; font-weight:700; }
-.badge-moderate { background:#d97706; color:#fff; padding:3px 10px;
-                  border-radius:20px; font-size:0.75rem; font-weight:700; }
-.badge-minor    { background:#38a169; color:#fff; padding:3px 10px;
-                  border-radius:20px; font-size:0.75rem; font-weight:700; }
-.badge-safe     { background:#2d3748; color:#94a3b8; padding:3px 10px;
-                  border-radius:20px; font-size:0.75rem; }
+.badge-major     { background:#e53e3e; color:#fff; padding:3px 10px;
+                   border-radius:20px; font-size:0.75rem; font-weight:700; }
+.badge-moderate  { background:#d97706; color:#fff; padding:3px 10px;
+                   border-radius:20px; font-size:0.75rem; font-weight:700; }
+.badge-minor     { background:#38a169; color:#fff; padding:3px 10px;
+                   border-radius:20px; font-size:0.75rem; font-weight:700; }
+.badge-predicted { background:#7e22ce; color:#fff; padding:3px 10px;
+                   border-radius:20px; font-size:0.75rem; font-weight:700; }
+.badge-safe      { background:#2d3748; color:#94a3b8; padding:3px 10px;
+                   border-radius:20px; font-size:0.75rem; }
 
 /* ── Drug pill chips ─────────────────── */
 .drug-pill {
@@ -186,9 +193,9 @@ def render_severity_card(interaction: dict):
     source = interaction.get("source", "knowledge_graph")
     conf   = interaction.get("confidence")
 
-    card_class  = {"MAJOR": "card-major", "MODERATE": "card-moderate", "MINOR": "card-minor"}.get(sev, "card-safe")
-    badge_class = {"MAJOR": "badge-major", "MODERATE": "badge-moderate", "MINOR": "badge-minor"}.get(sev, "badge-safe")
-    icon        = {"MAJOR": "🔴", "MODERATE": "🟡", "MINOR": "🟢"}.get(sev, "⚪")
+    card_class  = {"MAJOR": "card-major", "MODERATE": "card-moderate", "MINOR": "card-minor", "UNKNOWN": "card-predicted", "UNASSESSED": "card-predicted"}.get(sev, "card-safe")
+    badge_class = {"MAJOR": "badge-major", "MODERATE": "badge-moderate", "MINOR": "badge-minor", "UNKNOWN": "badge-predicted", "UNASSESSED": "badge-predicted"}.get(sev, "badge-safe")
+    icon        = {"MAJOR": "🔴", "MODERATE": "🟡", "MINOR": "🟢", "UNKNOWN": "🟣", "UNASSESSED": "🟣"}.get(sev, "⚪")
 
     source_badge = ""
     if status == "predicted" or source == "gnn_predicted":
