@@ -5,8 +5,9 @@ Pydantic models for FastAPI request validation and response serialisation.
 FastAPI uses these to auto-validate input and generate the /docs Swagger UI.
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional
+
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -35,11 +36,12 @@ class CheckRequest(BaseModel):
 
 # ── Response models ───────────────────────────────────────────────────────────
 class ResolvedDrug(BaseModel):
-    input:         str
-    matched_brand: str
-    generics:      list[str]
-    match_type:    str   # "exact" | "fuzzy" | "alias" | "not_found"
-    confidence:    int
+    input:           str
+    matched_brand:   str
+    generics:        list[str]
+    match_type:      str   # "exact" | "fuzzy" | "alias" | "generic_direct" | "not_found"
+    confidence:      int
+    review_required: bool = False
 
 
 class InteractionResult(BaseModel):
@@ -50,12 +52,17 @@ class InteractionResult(BaseModel):
     severity:     str   # MAJOR | MODERATE | MINOR
     mechanism:    str
     explanation:  str   # XAI plain-English explanation
+    status:       str = "documented"      # "documented" | "predicted"
+    source:       str = "knowledge_graph" # "knowledge_graph" | "gnn_predicted"
+    confidence:   Optional[float] = None  # GNN probability if predicted
+    evidence:     list[dict] = Field(default_factory=list)
 
 
 class SafePair(BaseModel):
     brand_a: str
     brand_b: str
     note:    str
+    status:  str = "not_documented"
 
 
 class CheckResponse(BaseModel):
@@ -89,14 +96,14 @@ class GraphNode(BaseModel):
 
 
 class GraphEdge(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     from_node: str = Field(alias="from")
     to:        str
     label:     str
     color:     str
     width:     int
 
-    class Config:
-        populate_by_name = True
 
 
 class GraphResponse(BaseModel):
@@ -111,7 +118,9 @@ class SearchResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    status:       str
-    neo4j:        str
+    status:        str
+    neo4j:         str
+    gnn_loaded:    bool = False
     brands_loaded: int
-    version:      str
+    version:       str = "1.0.0"
+

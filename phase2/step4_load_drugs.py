@@ -58,10 +58,11 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 ROOT           = Path(__file__).parent.parent
 MASTER_CSV     = ROOT / "phase1" / "outputs" / "master_mapping_table.csv"
 
-# AuraDB free-tier limits
-NODE_BUDGET    = 48_000   # leaves 2K headroom for safety
-REL_BUDGET     = 72_000   # leaves 3K headroom
+# AuraDB free-tier limits (50,000 nodes total, 175,000 relationships total)
+NODE_BUDGET    = 45_000   # leaves ~3,000 node headroom for Ingredient nodes and buffer
+REL_BUDGET     = 70_000   # leaves ~5,000 rel headroom
 BATCH_SIZE     = 300
+
 
 
 def get_driver():

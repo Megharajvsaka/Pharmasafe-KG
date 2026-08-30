@@ -147,13 +147,14 @@ def export_node_features(node_df: pd.DataFrame):
     print("  Creating node feature matrix...")
 
     features = []
+    import hashlib
     for _, row in node_df.iterrows():
-        name = str(row["name"])
+        name = str(row["name"]).lower().strip()
         has_drugbank_id = 1 if row["drugbank_id"] else 0
 
-        # Simple hash-based features (8 binary features from name chars)
-        # GNN will learn better representations — these are just seeds
-        hash_val = hash(name) % (2**16)
+        # Deterministic hash-based features (8 binary features from SHA-256)
+        digest = hashlib.sha256(name.encode("utf-8")).digest()
+        hash_val = int.from_bytes(digest[:2], byteorder="big")
         bits = [(hash_val >> i) & 1 for i in range(8)]
 
         features.append({
@@ -162,6 +163,7 @@ def export_node_features(node_df: pd.DataFrame):
             "has_drugbank_id": has_drugbank_id,
             **{f"hash_feat_{i}": bits[i] for i in range(8)},
         })
+
 
     df = pd.DataFrame(features)
     df.to_csv(OUTPUT_DIR / "node_features.csv", index=False)

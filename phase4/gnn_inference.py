@@ -47,7 +47,7 @@ class GNNPredictor:
         Returns True if successful, False if weights not found (training not done yet).
         """
         if not EMB_PATH.exists():
-            print(f"⚠️  GNN embeddings not found at {EMB_PATH}")
+            print(f"[WARNING] GNN embeddings not found at {EMB_PATH}")
             print("   Run Phase 4 Colab training first, then copy node_embeddings.pt here.")
             print("   API will use Neo4j direct lookup only (no GNN predictions).")
             return False
@@ -57,9 +57,10 @@ class GNNPredictor:
         self._node_to_idx = checkpoint["node_to_idx"]   # {name: idx}
         self._loaded      = True
 
-        print(f"✅ GNN embeddings loaded: {self._embeddings.shape[0]:,} drugs, "
+        print(f"[SUCCESS] GNN embeddings loaded: {self._embeddings.shape[0]:,} drugs, "
               f"dim={self._embeddings.shape[1]}")
         return True
+
 
     @property
     def is_loaded(self) -> bool:

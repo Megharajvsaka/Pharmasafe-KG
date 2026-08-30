@@ -10,6 +10,7 @@ Three public functions used by the API routes:
 """
 
 from phase3.app.database import get_driver
+from phase4.gnn_inference import get_predictor
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -23,23 +24,18 @@ def check_interactions(generics_map: dict[str, list[str]]) -> dict:
         generics_map: {brand_name: [generic1, generic2, ...], ...}
 
     Algorithm:
-        1. For every PAIR of brands, take the cross product of their generics
-        2. For each generic pair, query Neo4j for INTERACTS_WITH relationship
-        3. Return all found interactions sorted by severity
-
-    Returns a structured result dict consumed directly by the API and frontend.
+        1. Build candidate (g_a, g_b) pairs across all brand combinations.
+        2. Run a single batched Cypher UNWIND query against Neo4j to retrieve all documented interactions.
+        3. For generic pairs without KG evidence, invoke GNN inference fallback.
+        4. Aggregate, rank by severity, and preserve multi-evidence details.
     """
     driver = get_driver()
+    predictor = get_predictor()
 
-    # Flatten: collect all brand→generic mappings
     brand_names   = list(generics_map.keys())
-    all_generics  = set()
-    for generics in generics_map.values():
-        all_generics.update(generics)
-
     interactions  = []
-    pairs_checked = 0
     safe_pairs    = []
+    pairs_checked = 0
 
     # Generate all unique brand pairs
     brand_pairs = [
@@ -48,49 +44,99 @@ def check_interactions(generics_map: dict[str, list[str]]) -> dict:
         for j in range(i + 1, len(brand_names))
     ]
 
-    with driver.session() as session:
-        for brand_a, brand_b in brand_pairs:
-            generics_a = generics_map.get(brand_a, [])
-            generics_b = generics_map.get(brand_b, [])
+    # Collect all unique generic pairs to query in batch
+    all_candidate_pairs: set[tuple[str, str]] = set()
+    brand_to_generic_pairs: dict[tuple[str, str], list[tuple[str, str]]] = {}
 
-            found_for_pair = []
+    for brand_a, brand_b in brand_pairs:
+        generics_a = generics_map.get(brand_a, [])
+        generics_b = generics_map.get(brand_b, [])
+        pair_list = []
 
-            # Check every generic combination between the two brands
-            for g_a in generics_a:
-                for g_b in generics_b:
-                    if g_a == g_b:
-                        continue
-                    pairs_checked += 1
+        for g_a in generics_a:
+            for g_b in generics_b:
+                if g_a == g_b:
+                    continue
+                pair_key = (min(g_a, g_b), max(g_a, g_b))
+                pair_list.append((g_a, g_b))
+                all_candidate_pairs.add(pair_key)
+                pairs_checked += 1
 
-                    result = _query_interaction(session, g_a, g_b)
-                    if result:
-                        found_for_pair.append({
-                            "brand_a":      brand_a,
-                            "brand_b":      brand_b,
-                            "ingredient_a": result["ingredient_a"],
-                            "ingredient_b": result["ingredient_b"],
-                            "severity":     result["severity"],
-                            "mechanism":    result["mechanism"],
-                            "explanation":  _build_explanation(
-                                brand_a, result["ingredient_a"],
-                                brand_b, result["ingredient_b"],
-                                result["severity"], result["mechanism"]
-                            ),
-                        })
+        brand_to_generic_pairs[(brand_a, brand_b)] = pair_list
 
-            if found_for_pair:
-                # Keep only the highest-severity result per brand pair
-                found_for_pair.sort(key=lambda x: _severity_rank(x["severity"]))
-                interactions.append(found_for_pair[0])
-            else:
-                safe_pairs.append({
-                    "brand_a": brand_a,
-                    "brand_b": brand_b,
-                    "note":    "No known interaction detected"
-                })
+    # Execute single batched Cypher query for all candidate pairs
+    kg_results_by_pair: dict[tuple[str, str], list[dict]] = {}
+    if all_candidate_pairs:
+        with driver.session() as session:
+            kg_results_by_pair = _query_interactions_batch(session, list(all_candidate_pairs))
 
-    # Sort interactions: MAJOR → MODERATE → MINOR
-    interactions.sort(key=lambda x: _severity_rank(x["severity"]))
+    # Evaluate interactions and fallback per brand pair
+    for brand_a, brand_b in brand_pairs:
+        pair_list = brand_to_generic_pairs.get((brand_a, brand_b), [])
+        found_for_pair = []
+        predicted_for_pair = []
+
+        for g_a, g_b in pair_list:
+            pair_key = (min(g_a, g_b), max(g_a, g_b))
+            kg_hits = kg_results_by_pair.get(pair_key, [])
+
+            if kg_hits:
+                for hit in kg_hits:
+                    found_for_pair.append({
+                        "brand_a":      brand_a,
+                        "brand_b":      brand_b,
+                        "ingredient_a": hit["ingredient_a"],
+                        "ingredient_b": hit["ingredient_b"],
+                        "severity":     hit["severity"],
+                        "mechanism":    hit["mechanism"],
+                        "status":       "documented",
+                        "source":       "knowledge_graph",
+                        "confidence":   None,
+                        "evidence":     [hit],
+                        "explanation":  _build_explanation(
+                            brand_a, hit["ingredient_a"],
+                            brand_b, hit["ingredient_b"],
+                            hit["severity"], hit["mechanism"]
+                        ),
+                    })
+            elif predictor and predictor.is_loaded:
+                # GNN Link Prediction Fallback for KG misses
+                prob = predictor.predict(g_a, g_b)
+                if prob is not None and prob >= 0.70:
+                    predicted_for_pair.append({
+                        "brand_a":      brand_a,
+                        "brand_b":      brand_b,
+                        "ingredient_a": g_a,
+                        "ingredient_b": g_b,
+                        "severity":     "MODERATE",
+                        "mechanism":    f"Predicted potential interaction via GraphSAGE link prediction (confidence: {prob*100:.1f}%).",
+                        "status":       "predicted",
+                        "source":       "gnn_predicted",
+                        "confidence":   prob,
+                        "evidence":     [{"model": "GraphSAGE", "probability": prob, "threshold": 0.70}],
+                        "explanation":  _build_predicted_explanation(brand_a, g_a, brand_b, g_b, prob),
+                    })
+
+        if found_for_pair:
+            # Sort KG hits by severity and keep primary while preserving all evidence
+            found_for_pair.sort(key=lambda x: _severity_rank(x["severity"]))
+            primary = dict(found_for_pair[0])
+            primary["evidence"] = [item["evidence"][0] for item in found_for_pair if item.get("evidence")]
+            interactions.append(primary)
+        elif predicted_for_pair:
+            # Sort predicted by highest confidence
+            predicted_for_pair.sort(key=lambda x: x["confidence"] or 0, reverse=True)
+            interactions.append(predicted_for_pair[0])
+        else:
+            safe_pairs.append({
+                "brand_a": brand_a,
+                "brand_b": brand_b,
+                "note":    "No documented interaction in current knowledge base",
+                "status":  "not_documented",
+            })
+
+    # Sort interactions: Documented MAJOR → MODERATE → MINOR → Predicted
+    interactions.sort(key=lambda x: (_status_rank(x.get("status")), _severity_rank(x["severity"])))
 
     return {
         "total_drugs":         len(brand_names),
@@ -104,38 +150,41 @@ def check_interactions(generics_map: dict[str, list[str]]) -> dict:
     }
 
 
-def _query_interaction(session, generic_a: str, generic_b: str) -> dict | None:
+def _query_interactions_batch(session, pairs: list[tuple[str, str]]) -> dict[tuple[str, str], list[dict]]:
     """
-    Runs a single Cypher query to check if two generics interact.
-    Direction-agnostic: checks both (a→b) and (b→a).
-    Returns None if no interaction found.
+    Executes a single Cypher UNWIND query to retrieve interactions for multiple generic pairs.
     """
     CYPHER = """
-    MATCH (a:Ingredient {name: $g_a})-[r:INTERACTS_WITH]-(b:Ingredient {name: $g_b})
+    UNWIND $pairs AS p
+    MATCH (a:Ingredient {name: p[0]})-[r:INTERACTS_WITH]-(b:Ingredient {name: p[1]})
     RETURN
-        a.name           AS ingredient_a,
-        b.name           AS ingredient_b,
-        r.severity       AS severity,
-        r.mechanism      AS mechanism
-    LIMIT 1
+        a.name      AS ingredient_a,
+        b.name      AS ingredient_b,
+        r.severity  AS severity,
+        r.mechanism AS mechanism
     """
-    result = session.run(CYPHER, g_a=generic_a, g_b=generic_b)
-    row = result.single()
+    raw_pairs = [[p[0], p[1]] for p in pairs]
+    results = session.run(CYPHER, pairs=raw_pairs)
 
-    if row:
-        return {
-            "ingredient_a": row["ingredient_a"],
-            "ingredient_b": row["ingredient_b"],
-            "severity":     row["severity"],
+    grouped: dict[tuple[str, str], list[dict]] = {}
+    for row in results:
+        ing_a = str(row["ingredient_a"])
+        ing_b = str(row["ingredient_b"])
+        key = (min(ing_a, ing_b), max(ing_a, ing_b))
+        if key not in grouped:
+            grouped[key] = []
+        grouped[key].append({
+            "ingredient_a": ing_a,
+            "ingredient_b": ing_b,
+            "severity":     str(row["severity"] or "MODERATE").upper(),
             "mechanism":    str(row["mechanism"] or "")[:500],
-        }
-    return None
+        })
+    return grouped
 
 
 def _build_explanation(brand_a, ing_a, brand_b, ing_b, severity, mechanism) -> str:
     """
-    Builds the XAI explanation sentence shown to the doctor.
-    This is the core explainability output of the system.
+    Builds the XAI explanation sentence for documented KG interactions.
     """
     sev_text = {
         "MAJOR":    "⚠️ MAJOR RISK",
@@ -143,7 +192,6 @@ def _build_explanation(brand_a, ing_a, brand_b, ing_b, severity, mechanism) -> s
         "MINOR":    "ℹ️ MINOR INTERACTION",
     }.get(severity, "INTERACTION DETECTED")
 
-    # Shorten mechanism if too long
     mech = mechanism.strip()
     if len(mech) > 300:
         mech = mech[:297] + "..."
@@ -156,21 +204,44 @@ def _build_explanation(brand_a, ing_a, brand_b, ing_b, severity, mechanism) -> s
     )
 
 
+def _build_predicted_explanation(brand_a, ing_a, brand_b, ing_b, probability) -> str:
+    """
+    Builds explanation for GNN AI-predicted interactions.
+    """
+    pct = round(probability * 100, 1)
+    return (
+        f"🤖 AI PREDICTED INTERACTION ({pct}% confidence): {brand_a} and {brand_b}.\n\n"
+        f"{brand_a} contains {ing_a.title()}. "
+        f"{brand_b} contains {ing_b.title()}.\n\n"
+        f"Note: This interaction is not yet indexed in the primary Knowledge Graph, "
+        f"but was inferred by the Graph Neural Network (GraphSAGE link prediction)."
+    )
+
+
 def _severity_rank(sev: str) -> int:
     return {"MAJOR": 0, "MODERATE": 1, "MINOR": 2}.get(sev, 3)
 
 
+def _status_rank(status: str | None) -> int:
+    return {"documented": 0, "predicted": 1}.get(status or "", 2)
+
+
 def _build_summary(interactions: list) -> str:
     if not interactions:
-        return "No drug interactions detected. All combinations appear safe."
-    major    = sum(1 for i in interactions if i["severity"] == "MAJOR")
-    moderate = sum(1 for i in interactions if i["severity"] == "MODERATE")
-    minor    = sum(1 for i in interactions if i["severity"] == "MINOR")
+        return "No documented drug interactions detected in knowledge base."
+    doc_major    = sum(1 for i in interactions if i.get("status") == "documented" and i["severity"] == "MAJOR")
+    doc_moderate = sum(1 for i in interactions if i.get("status") == "documented" and i["severity"] == "MODERATE")
+    doc_minor    = sum(1 for i in interactions if i.get("status") == "documented" and i["severity"] == "MINOR")
+    predicted    = sum(1 for i in interactions if i.get("status") == "predicted")
+
     parts = []
-    if major:    parts.append(f"{major} MAJOR")
-    if moderate: parts.append(f"{moderate} MODERATE")
-    if minor:    parts.append(f"{minor} MINOR")
+    if doc_major:    parts.append(f"{doc_major} MAJOR (Documented)")
+    if doc_moderate: parts.append(f"{doc_moderate} MODERATE (Documented)")
+    if doc_minor:    parts.append(f"{doc_minor} MINOR (Documented)")
+    if predicted:    parts.append(f"{predicted} AI PREDICTED")
+
     return f"{len(interactions)} interaction(s) found: {', '.join(parts)}."
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

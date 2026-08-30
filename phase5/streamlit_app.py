@@ -176,33 +176,47 @@ def api_graph(drugs: list[str]) -> dict | None:
 
 
 def render_severity_card(interaction: dict):
-    sev  = interaction["severity"]
-    ba   = interaction["brand_a"]
-    bb   = interaction["brand_b"]
-    ia   = interaction["ingredient_a"]
-    ib   = interaction["ingredient_b"]
-    mech = interaction["mechanism"]
+    sev    = interaction.get("severity", "MODERATE")
+    ba     = interaction.get("brand_a", "")
+    bb     = interaction.get("brand_b", "")
+    ia     = interaction.get("ingredient_a", "")
+    ib     = interaction.get("ingredient_b", "")
+    mech   = interaction.get("mechanism", "")
+    status = interaction.get("status", "documented")
+    source = interaction.get("source", "knowledge_graph")
+    conf   = interaction.get("confidence")
 
     card_class  = {"MAJOR": "card-major", "MODERATE": "card-moderate", "MINOR": "card-minor"}.get(sev, "card-safe")
     badge_class = {"MAJOR": "badge-major", "MODERATE": "badge-moderate", "MINOR": "badge-minor"}.get(sev, "badge-safe")
     icon        = {"MAJOR": "🔴", "MODERATE": "🟡", "MINOR": "🟢"}.get(sev, "⚪")
 
+    source_badge = ""
+    if status == "predicted" or source == "gnn_predicted":
+        conf_str = f" ({round(conf * 100, 1)}% confidence)" if conf else ""
+        source_badge = f'<span style="background:#2b1055; color:#d8b4fe; border:1px solid #7e22ce; border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:600;">🤖 AI PREDICTED{conf_str}</span>'
+    else:
+        source_badge = '<span style="background:#0f291e; color:#86efac; border:1px solid #16a34a; border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:600;">📚 DOCUMENTED EVIDENCE</span>'
+
     st.markdown(f"""
     <div class="{card_class}">
-      <div style="display:flex; align-items:center; gap:0.7rem; margin-bottom:0.5rem;">
-        <span class="{badge_class}">{icon} {sev}</span>
-        <span style="color:#e2e8f0; font-weight:600; font-size:0.95rem;">
-          {ba} &nbsp;↔&nbsp; {bb}
-        </span>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.7rem;">
+          <span class="{badge_class}">{icon} {sev}</span>
+          <span style="color:#e2e8f0; font-weight:600; font-size:0.95rem;">
+            {ba} &nbsp;↔&nbsp; {bb}
+          </span>
+        </div>
+        <div>{source_badge}</div>
       </div>
       <div style="color:#94a3b8; font-size:0.82rem; margin-bottom:0.5rem;">
         Active ingredients:
-        <span class="ingredient-tag">{ia}</span> interacts with
+        <span class="ingredient-tag">{ia}</span> &nbsp;↔&nbsp;
         <span class="ingredient-tag">{ib}</span>
       </div>
       <div class="mechanism-text">{mech[:400]}{"..." if len(mech)>400 else ""}</div>
     </div>
     """, unsafe_allow_html=True)
+
 
 
 def render_pyvis_graph(graph_data: dict):
@@ -459,11 +473,11 @@ def main():
             st.markdown("""
             <div style="background:#0d1f14; border:1px solid #276749;
                         border-radius:10px; padding:1.2rem 1.5rem; text-align:center;">
-              <span style="font-size:1.4rem;">✅</span>
+              <span style="font-size:1.4rem;">ℹ️</span>
               <span style="color:#48bb78; font-size:1rem; font-weight:600;
-                           margin-left:0.5rem;">No interactions detected</span>
+                           margin-left:0.5rem;">No Documented Interactions Found</span>
               <div style="color:#68d391; font-size:0.82rem; margin-top:0.4rem;">
-                All drug combinations appear safe based on the Knowledge Graph.
+                No known interactions for this combination were found in the current Knowledge Graph or predicted by the GNN model.
               </div>
             </div>
             """, unsafe_allow_html=True)
@@ -471,19 +485,20 @@ def main():
             for interaction in interactions:
                 render_severity_card(interaction)
 
-        # ── Safe pairs ─────────────────────────────────────────────
+        # ── Safe / Non-documented pairs ─────────────────────────────
         safe = result.get("safe_pairs_detail", [])
         if safe:
-            with st.expander(f"✅ Safe combinations ({len(safe)})", expanded=False):
+            with st.expander(f"ℹ️ Non-Interacting Combinations ({len(safe)})", expanded=False):
                 for sp in safe:
                     st.markdown(
                         f'<div class="card-safe">'
-                        f'<span class="badge-safe">✅ SAFE</span> &nbsp;'
+                        f'<span class="badge-safe">ℹ️ NO DOCUMENTED DDI</span> &nbsp;'
                         f'<span style="color:#94a3b8; font-size:0.88rem;">'
                         f'{sp["brand_a"]} &nbsp;+&nbsp; {sp["brand_b"]}</span>'
                         f'</div>',
                         unsafe_allow_html=True
                     )
+
 
         # ── Interactive graph ──────────────────────────────────────
         st.markdown("### 🕸️ Drug Interaction Graph")

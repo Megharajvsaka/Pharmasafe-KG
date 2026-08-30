@@ -11,11 +11,8 @@ openpyxl==3.1.2          # read Excel files if needed
 thefuzz==0.22.1
 python-Levenshtein==0.25.1  # speeds up thefuzz significantly
 
-# ── NLP ──────────────────────────────────────────────────────────────────────
-scispacy==0.5.4
-spacy==3.7.4
-# After installing the above, run this separately:
-# pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_ner_bc5cdr_md-0.5.4.tar.gz
+# ── ML / Inference ───────────────────────────────────────────────────────────
+torch>=2.0.0              # for GNN inference & embeddings lookup
 
 # ── Knowledge graph ──────────────────────────────────────────────────────────
 neo4j==6.1.0
@@ -30,8 +27,10 @@ python-dotenv==1.0.1
 streamlit==1.33.0
 pyvis==0.3.2
 
-# ── Utilities ────────────────────────────────────────────────────────────────
+# ── Utilities & Testing ──────────────────────────────────────────────────────
 tqdm==4.66.2              # progress bars for long loops
 colorama==0.4.6           # colored terminal output
 rich==13.7.1              # pretty tables in terminal
-requests==2.31.0          # HTTP calls (ChEMBL API)
+requests==2.31.0          # HTTP calls
+pytest>=8.0.0             # automated unit & integration testing
+httpx>=0.27.0             # async HTTP client for FastAPI testing

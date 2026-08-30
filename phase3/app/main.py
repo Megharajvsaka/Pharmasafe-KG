@@ -38,6 +38,7 @@ from phase3.app.models import (
     CheckRequest, CheckResponse, DrugInfoResponse,
     GraphResponse, SearchResponse, HealthResponse
 )
+from phase4.gnn_inference import get_predictor
 
 
 # ── Startup / Shutdown ────────────────────────────────────────────────────────
@@ -48,6 +49,16 @@ async def lifespan(app: FastAPI):
     print("[SYSTEM] Loading Brand-to-Generic resolver...")
     brand_count = load_resolver()
     print(f"[SUCCESS] Resolver loaded: {brand_count:,} brand mappings")
+
+    print("[SYSTEM] Initializing GNN Predictor...")
+    try:
+        predictor = get_predictor()
+        if predictor.is_loaded:
+            print("[SUCCESS] GNN Predictor active for fallback link prediction")
+        else:
+            print("[INFO] GNN Predictor running in fallback-only mode")
+    except Exception as e:
+        print(f"[WARNING] GNN initialization notice: {e}")
 
     print("[SYSTEM] Verifying Neo4j connection...")
     try:
@@ -78,10 +89,16 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS — allow Streamlit frontend to call this API
+# CORS configuration
+cors_env = os.getenv("CORS_ORIGINS", "http://localhost:8501,http://localhost:3000,http://localhost:5173")
+origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+if "*" not in origins and "http://localhost:8501" not in origins:
+    origins.append("http://localhost:8501")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # In production: restrict to your Streamlit URL
+    allow_origins=origins if origins else ["*"],
+    allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
@@ -95,7 +112,7 @@ app.add_middleware(
 def health_check():
     """
     Health check endpoint.
-    Returns API status, Neo4j connectivity, and resolver stats.
+    Returns API status, Neo4j connectivity, GNN status, and resolver stats.
     """
     # Test Neo4j connection
     try:
@@ -109,13 +126,16 @@ def health_check():
         neo4j_status = f"error: {str(e)[:100]}"
 
     brands = get_all_brand_names()
+    predictor = get_predictor()
 
     return HealthResponse(
         status="ok",
         neo4j=neo4j_status,
+        gnn_loaded=predictor.is_loaded if predictor else False,
         brands_loaded=len(brands),
         version="1.0.0",
     )
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -196,11 +216,12 @@ def check(request: CheckRequest):
     # Step 4: Attach resolved drug info to response
     result["resolved_drugs"] = [
         {
-            "input":         r["input"],
-            "matched_brand": r["matched_brand"],
-            "generics":      r["generics"],
-            "match_type":    r["match_type"],
-            "confidence":    r["confidence"],
+            "input":           r["input"],
+            "matched_brand":   r["matched_brand"],
+            "generics":        r["generics"],
+            "match_type":      r["match_type"],
+            "confidence":      r["confidence"],
+            "review_required": r.get("review_required", False),
         }
         for r in resolved.values()
     ]
@@ -208,12 +229,14 @@ def check(request: CheckRequest):
     # Add unresolved drugs as "not_found" entries
     for name in not_found:
         result["resolved_drugs"].append({
-            "input":         name,
-            "matched_brand": name,
-            "generics":      [],
-            "match_type":    "not_found",
-            "confidence":    0,
+            "input":           name,
+            "matched_brand":   name,
+            "generics":        [],
+            "match_type":      "not_found",
+            "confidence":      0,
+            "review_required": False,
         })
+
 
     return result
 

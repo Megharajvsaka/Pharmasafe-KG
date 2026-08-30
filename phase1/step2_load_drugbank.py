@@ -58,13 +58,13 @@ MAJOR_KEYWORDS = [
     "atrioventricular blocking", "bradycardic", "torsade",
     "central neurotoxic", "nephrotoxic", "anaphylactic",
     "risk or severity of bleeding", "hypoglycemic",
-    "risk or severity of adverse effects",
     "anticoagulant activities",   # warfarin + aspirin etc
     "antiplatelet activities",    # bleeding risk combinations
     "risk or severity of hypoglycemia",
     "risk or severity of hypertension",
     "risk or severity of serotonin",
 ]
+
 MINOR_KEYWORDS = [
     "absorption", "excretion", "bioavailability",
     "photosensitizing", "diagnostic",
