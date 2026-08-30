@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Main Canvas & Surface */
+    --bg-app: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-surface-subtle: #f1f5f9;
+
+    /* Text */
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+
+    /* Borders */
+    --border-subtle: #e2e8f0;
+    --border-strong: #cbd5e1;
+
+    /* Brand Clinical Primary */
+    --primary: #0284c7;
+    --primary-hover: #0369a1;
+    --primary-light: #e0f2fe;
+
+    /* Severity Colors */
+    --severity-major: #dc2626;
+    --severity-major-bg: #fef2f2;
+    --severity-major-border: #fca5a5;
+
+    --severity-moderate: #d97706;
+    --severity-moderate-bg: #fffbeb;
+    --severity-moderate-border: #fcd34d;
+
+    --severity-minor: #16a34a;
+    --severity-minor-bg: #f0fdf4;
+    --severity-minor-border: #86efac;
+
+    /* Source Colors */
+    --source-predicted: #7e22ce;
+    --source-predicted-bg: #f5f3ff;
+    --source-predicted-border: #d8b4fe;
+
+    --source-documented: #059669;
+    --source-documented-bg: #ecfdf5;
+    --source-documented-border: #6ee7b7;
+  }
+
+  body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+}
+
+/* Accessible focus styling */
+:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}
+
+/* Clinical Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
