@@ -73,8 +73,9 @@ export interface CheckResponse {
 }
 
 export interface DrugInteractionItem {
-  interacting_ingredient: string;
-  severity: "MAJOR" | "MODERATE" | "MINOR";
+  source_generic: string;
+  target_generic: string;
+  severity: "MAJOR" | "MODERATE" | "MINOR" | string;
   mechanism: string;
   [key: string]: unknown;
 }
@@ -103,6 +104,7 @@ export interface GraphEdge {
   label: string;
   color: string;
   width: number;
+  dashes?: boolean;
   title?: string;
   severity?: string;
 }

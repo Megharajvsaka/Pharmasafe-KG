@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {
   ShieldAlert,
   AlertTriangle,
@@ -9,6 +10,7 @@ import {
   Database,
   ArrowRightLeft,
   Pill,
+  ExternalLink,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -73,12 +75,24 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
     <Card accent={getCardAccent()} className={`p-4 sm:p-5 text-left ${className}`}>
       {/* Header: Brands + Badges */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {getSeverityIcon()}
-          <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-            <span>{brand_a}</span>
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+            <Link
+              href={`/drugs/${encodeURIComponent(brand_a)}`}
+              className="hover:text-sky-600 hover:underline transition-colors flex items-center gap-0.5"
+              title={`View ${brand_a} monograph`}
+            >
+              <span>{brand_a}</span>
+            </Link>
             <ArrowRightLeft className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span>{brand_b}</span>
+            <Link
+              href={`/drugs/${encodeURIComponent(brand_b)}`}
+              className="hover:text-sky-600 hover:underline transition-colors flex items-center gap-0.5"
+              title={`View ${brand_b} monograph`}
+            >
+              <span>{brand_b}</span>
+            </Link>
           </h3>
         </div>
 

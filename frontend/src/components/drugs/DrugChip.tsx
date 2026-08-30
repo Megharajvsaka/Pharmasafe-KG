@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Pill, X } from "lucide-react";
+import Link from "next/link";
+import { Pill, X, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 
 export interface DrugChipProps {
@@ -9,6 +10,7 @@ export interface DrugChipProps {
   onRemove: (name: string) => void;
   index?: number;
   disabled?: boolean;
+  showMonographLink?: boolean;
 }
 
 export const DrugChip: React.FC<DrugChipProps> = ({
@@ -16,6 +18,7 @@ export const DrugChip: React.FC<DrugChipProps> = ({
   onRemove,
   index = 0,
   disabled = false,
+  showMonographLink = true,
 }) => {
   return (
     <motion.div
@@ -27,6 +30,19 @@ export const DrugChip: React.FC<DrugChipProps> = ({
     >
       <Pill className="w-3.5 h-3.5 text-sky-600 shrink-0" />
       <span className="font-semibold">{name}</span>
+
+      {showMonographLink && (
+        <Link
+          href={`/drugs/${encodeURIComponent(name)}`}
+          target="_blank"
+          className="text-sky-400 hover:text-sky-700 p-0.5 rounded transition-colors"
+          title={`View ${name} monograph (opens in new tab)`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ExternalLink className="w-3 h-3" />
+        </Link>
+      )}
+
       {!disabled && (
         <button
           type="button"

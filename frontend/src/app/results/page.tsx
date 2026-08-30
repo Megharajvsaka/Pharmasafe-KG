@@ -16,6 +16,7 @@ import {
   Pill,
   GitGraph,
   CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
@@ -309,11 +310,25 @@ export default function ResultsPage() {
         <ResolvedDrugsTable resolvedDrugs={resolved_drugs} />
 
         {/* ── 5. Subgraph Topology Visualization ────────────────────────────── */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-            <GitGraph className="w-4 h-4 text-sky-600" />
-            <span>Interactive Subgraph Topology</span>
-          </h2>
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+              <GitGraph className="w-4 h-4 text-sky-600" />
+              <span>Interactive Subgraph Topology</span>
+            </h2>
+            <Link
+              href={`/graph?${selectedDrugs.map((d) => `drugs=${encodeURIComponent(d)}`).join("&")}`}
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                rightIcon={<ExternalLink className="w-3.5 h-3.5" />}
+              >
+                Open Full Knowledge Graph Explorer
+              </Button>
+            </Link>
+          </div>
           <InteractionGraph drugs={selectedDrugs} height={400} />
         </div>
 

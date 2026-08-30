@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronDown, CheckCircle2, RefreshCw, AlertCircle, Pill } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, CheckCircle2, RefreshCw, AlertCircle, Pill, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ResolvedDrug } from "@/types/api";
 import { Card } from "@/components/ui/Card";
@@ -91,32 +92,51 @@ export const ResolvedDrugsTable: React.FC<ResolvedDrugsTableProps> = ({
                     <th className="py-2.5 px-3">Matched Brand</th>
                     <th className="py-2.5 px-3">Active Chemical Ingredients</th>
                     <th className="py-2.5 px-3">Resolution Type</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {resolvedDrugs.map((rd, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-2.5 px-3 font-semibold text-slate-900">{rd.input}</td>
-                      <td className="py-2.5 px-3 text-slate-600">{rd.matched_brand || "—"}</td>
-                      <td className="py-2.5 px-3">
-                        {rd.generics && rd.generics.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {rd.generics.map((g, gi) => (
-                              <span
-                                key={gi}
-                                className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded font-mono text-[11px] text-slate-800"
-                              >
-                                {g}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-red-500 italic text-[11px]">None resolved</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-3">{getMatchBadge(rd.match_type, rd.confidence)}</td>
-                    </tr>
-                  ))}
+                  {resolvedDrugs.map((rd, idx) => {
+                    const brandTarget = rd.matched_brand || rd.input;
+                    const canViewMonograph = rd.match_type !== "not_found";
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-2.5 px-3 font-semibold text-slate-900">{rd.input}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{rd.matched_brand || "—"}</td>
+                        <td className="py-2.5 px-3">
+                          {rd.generics && rd.generics.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {rd.generics.map((g, gi) => (
+                                <span
+                                  key={gi}
+                                  className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded font-mono text-[11px] text-slate-800"
+                                >
+                                  {g}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-red-500 italic text-[11px]">None resolved</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">{getMatchBadge(rd.match_type, rd.confidence)}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          {canViewMonograph ? (
+                            <Link
+                              href={`/drugs/${encodeURIComponent(brandTarget)}`}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-600 hover:text-sky-800 hover:underline"
+                            >
+                              <span>Monograph</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </Link>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

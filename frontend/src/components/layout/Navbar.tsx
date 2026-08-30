@@ -13,6 +13,7 @@ import {
   Home,
   CheckCircle2,
   AlertTriangle,
+  GitGraph,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { HealthResponse } from "@/types/api";
@@ -51,6 +52,7 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { href: "/", label: "Home", icon: <Home className="w-4 h-4" /> },
     { href: "/analyze", label: "Analyze DDI", icon: <FlaskConical className="w-4 h-4" /> },
+    { href: "/graph", label: "Graph Explorer", icon: <GitGraph className="w-4 h-4 text-sky-600" /> },
     {
       href: "/demo",
       label: "Defense Demo",
