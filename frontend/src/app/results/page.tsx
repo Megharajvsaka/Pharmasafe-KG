@@ -19,7 +19,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -31,11 +30,15 @@ import { SafePairCard } from "@/components/interactions/SafePairCard";
 import { ResolvedDrugsTable } from "@/components/interactions/ResolvedDrugsTable";
 import { InteractionGraph } from "@/components/graph/InteractionGraph";
 import { useAnalysis } from "@/context/AnalysisContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ResultsPage() {
   const router = useRouter();
-  const { selectedDrugs, checkResult, resetAnalysis } = useAnalysis();
+  const { user } = useAuth();
+  const { selectedDrugs, checkResult, resetAnalysis, clearDrugs } = useAnalysis();
   const [activeTab, setActiveTab] = useState<string>("all");
+
+  const workbenchUrl = user?.role === "admin" ? "/admin?tab=demo" : "/dashboard?tab=analyse";
 
   // Handle direct navigation with no analysis data
   if (!checkResult || !checkResult.brand_names || checkResult.brand_names.length === 0) {
@@ -43,8 +46,7 @@ export default function ResultsPage() {
       <div className="w-full pb-16">
         <div className="bg-white border-b border-slate-200 py-6">
           <PageContainer>
-            <Breadcrumbs items={[{ label: "Analysis Results" }]} />
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
               Polypharmacy Analysis Results
             </h1>
           </PageContainer>
@@ -55,7 +57,7 @@ export default function ResultsPage() {
             title="No Active Analysis Available"
             description="You have not evaluated any drug combinations yet, or your session has expired. Start by selecting medications on the workbench."
             action={
-              <Link href="/analyze">
+              <Link href={workbenchUrl}>
                 <Button variant="primary" size="md">
                   Start New Analysis
                 </Button>
@@ -118,7 +120,8 @@ export default function ResultsPage() {
 
   const handleNewAnalysis = () => {
     resetAnalysis();
-    router.push("/analyze");
+    clearDrugs();
+    router.push(workbenchUrl);
   };
 
   return (
@@ -126,13 +129,6 @@ export default function ResultsPage() {
       {/* Top Header Bar */}
       <div className="bg-white border-b border-slate-200 py-6 print:hidden">
         <PageContainer>
-          <Breadcrumbs
-            items={[
-              { label: "Medication Workbench", href: "/analyze" },
-              { label: "Analysis Results" },
-            ]}
-            className="mb-2"
-          />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -150,7 +146,7 @@ export default function ResultsPage() {
 
             {/* Action Buttons */}
             <div className="flex items-center flex-wrap gap-2">
-              <Link href="/analyze">
+              <Link href={workbenchUrl}>
                 <Button
                   variant="outline"
                   size="sm"

@@ -136,12 +136,12 @@ export default function DrugMonographPage() {
             description="The requested commercial brand or formulation is not present in the indexed Indian pharmaceutical catalog (304,404 formulations). Please verify spelling or search by generic chemical name."
             action={
               <div className="flex gap-3 justify-center">
-                <Link href="/analyze">
+                <Link href="/dashboard?tab=analyse">
                   <Button variant="primary" size="md" leftIcon={<Search className="w-4 h-4" />}>
                     Search Medication Catalog
                   </Button>
                 </Link>
-                <Link href="/analyze">
+                <Link href="/dashboard?tab=analyse">
                   <Button variant="outline" size="md" leftIcon={<ArrowLeft className="w-4 h-4" />}>
                     Back to Workbench
                   </Button>

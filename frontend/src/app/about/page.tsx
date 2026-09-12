@@ -126,7 +126,7 @@ export default function AboutPage() {
 
         {/* Action Button */}
         <div className="flex justify-end gap-3">
-          <Link href="/analyze">
+          <Link href="/dashboard?tab=analyse">
             <Button variant="primary" rightIcon={<ArrowRight className="w-4 h-4" />}>
               Open Medication Workbench
             </Button>

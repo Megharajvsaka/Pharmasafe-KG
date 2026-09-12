@@ -1,33 +1,28 @@
-"""
-tests/test_gnn.py
------------------
-Unit tests for the GNNPredictor inference module using unittest.
-"""
-
 import unittest
-from phase4.gnn_inference import GNNPredictor, get_predictor
+from ml_engine.inference.gnn_predictor import GNNPredictor, get_predictor
 
 
 class TestGNN(unittest.TestCase):
-    def test_gnn_predictor_singleton(self):
-        """Test get_predictor returns an initialized singleton instance."""
-        predictor = get_predictor()
-        self.assertIsNotNone(predictor)
+    @classmethod
+    def setUpClass(cls):
+        cls.predictor = get_predictor()
 
     def test_gnn_predict_known_pair(self):
-        """Test GNN prediction for known vocabulary drugs."""
-        predictor = get_predictor()
-        if predictor.is_loaded:
-            prob = predictor.predict("warfarin", "aspirin")
-            self.assertIsNotNone(prob)
-            self.assertTrue(0.0 <= prob <= 1.0)
+        if not self.predictor.is_loaded:
+            self.skipTest("GNN weights not present on this machine")
+        prob = self.predictor.predict("warfarin", "aspirin")
+        self.assertIsNotNone(prob)
+        self.assertGreaterEqual(prob, 0.0)
+        self.assertLessEqual(prob, 1.0)
 
     def test_gnn_predict_oov(self):
-        """Test GNN prediction returns None for out-of-vocabulary terms."""
-        predictor = get_predictor()
-        if predictor.is_loaded:
-            prob = predictor.predict("non_existent_drug_123", "aspirin")
-            self.assertIsNone(prob)
+        prob = self.predictor.predict("notadrug_xyz_123", "paracetamol")
+        self.assertIsNone(prob)
+
+    def test_gnn_predictor_singleton(self):
+        p1 = get_predictor()
+        p2 = get_predictor()
+        self.assertIs(p1, p2)
 
 
 if __name__ == "__main__":

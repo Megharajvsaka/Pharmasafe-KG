@@ -60,7 +60,20 @@ htmlcov/
 # ── Jupyter notebooks checkpoints ───────────────────────────────────────────
 .ipynb_checkpoints/
 
-# ── OS-generated files ──────────────────────────────────────────────────────
+# ── OS & Local DB generated files ───────────────────────────────────────────
 *.log
 *.tmp
 *.bak
+*.db
+*.sqlite3
+
+# ── Clean Architecture Data & Logs ──────────────────────────────────────────
+data_pipeline/data/
+data_pipeline/outputs/
+data_pipeline/logs/
+ml_engine/data/
+*.db
+*.sqlite
+*.sqlite3
+frontend/.next/
+frontend/node_modules/

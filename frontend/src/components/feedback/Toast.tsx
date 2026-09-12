@@ -12,8 +12,19 @@ export interface ToastMessage {
   message?: string;
 }
 
+export interface ToastOptions {
+  type?: ToastType;
+  title: string;
+  description?: string;
+  message?: string;
+}
+
 interface ToastContextType {
-  showToast: (type: ToastType, title: string, message?: string) => void;
+  showToast: (
+    typeOrOptions: ToastType | ToastOptions,
+    title?: string,
+    message?: string
+  ) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -29,14 +40,32 @@ export const useToast = () => {
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const showToast = useCallback((type: ToastType, title: string, message?: string) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, type, title, message }]);
+  const showToast = useCallback(
+    (typeOrOptions: ToastType | ToastOptions, title?: string, message?: string) => {
+      const id = Math.random().toString(36).substring(2, 9);
 
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
-  }, []);
+      let finalType: ToastType = "info";
+      let finalTitle = "";
+      let finalMessage: string | undefined = undefined;
+
+      if (typeof typeOrOptions === "object") {
+        finalType = typeOrOptions.type || "info";
+        finalTitle = typeOrOptions.title || "";
+        finalMessage = typeOrOptions.description || typeOrOptions.message;
+      } else {
+        finalType = typeOrOptions;
+        finalTitle = title || "";
+        finalMessage = message;
+      }
+
+      setToasts((prev) => [...prev, { id, type: finalType, title: finalTitle, message: finalMessage }]);
+
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 4000);
+    },
+    []
+  );
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -65,17 +94,17 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto p-3 rounded-lg border shadow-lg flex items-start gap-2.5 transition-all ${borders[t.type]}`}
+              className={`pointer-events-auto p-3.5 rounded-lg border shadow-lg flex items-start gap-2.5 transition-all ${borders[t.type]}`}
               role="alert"
             >
               {icons[t.type]}
               <div className="flex-1 text-left">
-                <h5 className="text-xs font-semibold text-slate-800">{t.title}</h5>
-                {t.message && <p className="text-xs text-slate-500 mt-0.5">{t.message}</p>}
+                <h5 className="text-xs font-semibold text-slate-900">{t.title}</h5>
+                {t.message && <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{t.message}</p>}
               </div>
               <button
                 onClick={() => removeToast(t.id)}
-                className="text-slate-400 hover:text-slate-600 p-0.5 rounded-sm"
+                className="text-slate-400 hover:text-slate-600 p-0.5 rounded-sm cursor-pointer"
                 aria-label="Dismiss toast"
               >
                 <X className="w-3.5 h-3.5" />

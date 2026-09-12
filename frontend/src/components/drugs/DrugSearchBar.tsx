@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 
 export interface DrugSearchBarProps {
   onSelectDrug: (drugName: string) => void;
+  placeholder?: string;
   disabled?: boolean;
   maxReached?: boolean;
   className?: string;
@@ -13,6 +14,7 @@ export interface DrugSearchBarProps {
 
 export const DrugSearchBar: React.FC<DrugSearchBarProps> = ({
   onSelectDrug,
+  placeholder,
   disabled = false,
   maxReached = false,
   className = "",
@@ -145,9 +147,10 @@ export const DrugSearchBar: React.FC<DrugSearchBarProps> = ({
             highlightedIndex >= 0 ? `suggestion-item-${highlightedIndex}` : undefined
           }
           placeholder={
-            maxReached
+            placeholder ||
+            (maxReached
               ? "Maximum 10 medications reached."
-              : "Search Indian brand or generic name (e.g. Combiflam, Ecosprin, Warfarin)..."
+              : "Search Indian brand or generic name (e.g. Combiflam, Ecosprin, Warfarin)...")
           }
           className="w-full bg-white text-slate-900 placeholder:text-slate-400 text-sm rounded-md border border-slate-300 pl-9 pr-24 py-2.5 shadow-2xs focus-visible:outline-2 focus-visible:outline-sky-600 hover:border-slate-400 transition-colors disabled:bg-slate-100 disabled:cursor-not-allowed"
         />

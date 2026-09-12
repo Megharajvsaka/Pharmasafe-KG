@@ -1,16 +1,3 @@
-"""
-tests/test_p0_pipeline.py
--------------------------
-Targeted regression and validation test suite for P0 Critical Fixes:
-1. Windows-safe Phase 1 utilities and string formatting.
-2. Regenerated severity distribution validation.
-3. Single-source dataset provenance.
-4. Deterministic SHA-256 node feature consistency.
-5. Bidirectional negative sampling validation (zero overlap with positives, zero self-edges).
-6. Leakage-free train/val/test splitting (zero val/test edges in message-passing graph).
-7. GNN binary link prediction target consistency.
-"""
-
 import hashlib
 import random
 from pathlib import Path
@@ -20,23 +7,28 @@ import pytest
 import torch
 
 ROOT = Path(__file__).parent.parent
-PHASE1_OUT = ROOT / "phase1" / "outputs"
-COLAB_DIR = ROOT / "phase4" / "colab_data"
+DATA_PIPELINE_OUT = ROOT / "data_pipeline" / "outputs" if (ROOT / "data_pipeline" / "outputs").exists() else ROOT / "phase1" / "outputs"
+ML_DATA_DIR = ROOT / "ml_engine" / "data" if (ROOT / "ml_engine" / "data").exists() else ROOT / "phase4" / "colab_data"
 
 
 class TestP0WindowsSafePhase1:
     """Verify Phase 1 logging and utilities do not crash on Windows console encoding."""
 
     def test_utils_print_section_ascii_safe(self, capsys):
-        from phase1.utils import print_section
+        try:
+            from data_pipeline.cleaning.utils import print_section
+        except ImportError:
+            from phase1.utils import print_section
         print_section("TEST SECTION HEADER")
         captured = capsys.readouterr()
         assert "TEST SECTION HEADER" in captured.out
-        # Verify no non-ASCII box-drawing characters in the printed output
         assert all(ord(c) < 128 for c in captured.out)
 
     def test_utils_write_report_ascii_safe(self, tmp_path, capsys):
-        from phase1.utils import write_report
+        try:
+            from data_pipeline.cleaning.utils import write_report
+        except ImportError:
+            from phase1.utils import write_report
         report_file = tmp_path / "test_report.txt"
         write_report(["Line 1", "Line 2"], report_file)
         captured = capsys.readouterr()
@@ -50,18 +42,15 @@ class TestP0SeverityRegeneration:
 
     @pytest.fixture(scope="class")
     def ddi_df(self):
-        csv_path = PHASE1_OUT / "drugbank_ddi_cleaned.csv"
+        csv_path = DATA_PIPELINE_OUT / "drugbank_ddi_cleaned.csv"
         assert csv_path.exists(), f"Missing {csv_path}"
         return pd.read_csv(csv_path)
 
     def test_severity_distribution_calibrated(self, ddi_df):
         """Verify the distribution is no longer 87.9% MAJOR."""
         counts = ddi_df["severity"].value_counts(normalize=True) * 100
-        # MODERATE should be the majority (~70-75%)
         assert counts["MODERATE"] > 65.0, f"Expected MODERATE > 65%, got {counts['MODERATE']:.2f}%"
-        # MAJOR should be clinically calibrated (~20-25%)
         assert counts["MAJOR"] < 30.0, f"Expected MAJOR < 30%, got {counts['MAJOR']:.2f}%"
-        # MINOR should be present (~3-6%)
         assert "MINOR" in counts and counts["MINOR"] > 1.0
 
     def test_no_missing_severities(self, ddi_df):
@@ -81,9 +70,9 @@ class TestP0ColabDataProvenance:
 
     @pytest.fixture(scope="class")
     def colab_data(self):
-        nodes = pd.read_csv(COLAB_DIR / "nodes.csv")
-        edges = pd.read_csv(COLAB_DIR / "edges.csv")
-        feats = pd.read_csv(COLAB_DIR / "node_features.csv")
+        nodes = pd.read_csv(ML_DATA_DIR / "nodes.csv")
+        edges = pd.read_csv(ML_DATA_DIR / "edges.csv")
+        feats = pd.read_csv(ML_DATA_DIR / "node_features.csv")
         return nodes, edges, feats
 
     def test_node_feature_order_and_alignment(self, colab_data):
@@ -123,7 +112,7 @@ class TestP0GNNLeakageFreeSplit:
     """Verify train/val/test splits guarantee zero edge leakage into message-passing graph."""
 
     def test_leakage_free_edge_index_construction(self):
-        edges = pd.read_csv(COLAB_DIR / "edges.csv")
+        edges = pd.read_csv(ML_DATA_DIR / "edges.csv")
         pos_edges = edges[edges["label"] == 1].reset_index(drop=True)
         neg_edges = edges[edges["label"] == 0].reset_index(drop=True)
 
@@ -137,12 +126,10 @@ class TestP0GNNLeakageFreeSplit:
         pos_val = pos_shuffled.iloc[n_train:n_train + n_val].reset_index(drop=True)
         pos_test = pos_shuffled.iloc[n_train + n_val:].reset_index(drop=True)
 
-        # Message passing edge index derived strictly from pos_train
         train_edge_set = set(zip(pos_train["node1"], pos_train["node2"])) | set(zip(pos_train["node2"], pos_train["node1"]))
         val_edge_set = set(zip(pos_val["node1"], pos_val["node2"])) | set(zip(pos_val["node2"], pos_val["node1"]))
         test_edge_set = set(zip(pos_test["node1"], pos_test["node2"])) | set(zip(pos_test["node2"], pos_test["node1"]))
 
-        # Verify strict disjointness
         assert len(train_edge_set.intersection(val_edge_set)) == 0, "Leakage: Validation edges found in training graph!"
         assert len(train_edge_set.intersection(test_edge_set)) == 0, "Leakage: Test edges found in training graph!"
         assert len(val_edge_set.intersection(test_edge_set)) == 0, "Validation and Test positive edges overlap!"
